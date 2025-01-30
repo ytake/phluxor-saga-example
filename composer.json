@@ -1,0 +1,29 @@
+{
+  "name": "ytake/phluxor-saga-example",
+  "description": "Saga pattern example with phluxor",
+  "minimum-stability": "stable",
+  "license": "proprietary",
+  "authors": [
+    {
+      "name": "ytake",
+      "email": "yuuki.takezawa@comnect.jp.net"
+    }
+  ],
+  "require": {
+    "php": "^8.3",
+    "ext-pdo": "*",
+    "ext-swoole": "^6.0",
+    "phluxor/phluxor": "^0.2.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "PhluxorSaga\\": "src/PhluxorSaga"
+    }
+  },
+  "config": {
+    "allow-plugins": {
+      "php-http/discovery": true,
+      "tbachert/spi": true
+    }
+  }
+}
