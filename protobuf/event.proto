@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package protobuf;
+
+option php_namespace = "PhluxorSaga\\ProtoBuf";
+option php_metadata_namespace = "PhluxorSaga\\Metadata\\ProtoBuf";
+
+message TransferFailed {
+  string reason = 1;
+}
+
+message StatusUnknown {}
+
+message TransferStarted {}
+
+message AccountDebited {}
+
+message EscalateTransfer {
+  string reason = 1;
+}
+
+message FailedAndInconsistent {}
+
+message FailedButConsistentResult {}
+
+message DebitRolledBack {}
