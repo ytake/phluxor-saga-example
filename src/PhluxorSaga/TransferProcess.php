@@ -4,33 +4,31 @@ declare(strict_types=1);
 
 namespace PhluxorSaga;
 
+use Exception;
+use Google\Protobuf\Internal\Message;
 use Phluxor\ActorSystem\Behavior;
 use Phluxor\ActorSystem\Context\ContextInterface;
-use Phluxor\ActorSystem\Message\ActorInterface;
-use Phluxor\ActorSystem\Message\ReceiveFunction;
-use Phluxor\ActorSystem\Message\Restarting;
-use Phluxor\ActorSystem\Message\Started;
-use Phluxor\ActorSystem\Message\Stopped;
-use Phluxor\ActorSystem\Message\Stopping;
+use Phluxor\ActorSystem\Message\{
+    ActorInterface,
+    ReceiveFunction,
+    Restarting,
+    Started,
+    Stopped,
+    Stopping
+};
 use Phluxor\ActorSystem\Props;
 use Phluxor\ActorSystem\ProtoBuf\Terminated;
 use Phluxor\ActorSystem\Ref;
-use Phluxor\Persistence\Message\OfferSnapshot;
 use Phluxor\Persistence\Mixin;
 use Phluxor\Persistence\PersistentInterface;
+use PhluxorSaga\Message\GetBalance;
 use PhluxorSaga\Message\UnknownResult;
-use PhluxorSaga\ProtoBuf\AccountDebited;
 use PhluxorSaga\Message\Credit;
 use PhluxorSaga\Message\Debit;
-use PhluxorSaga\Message\FailedButConsistentResult;
 use PhluxorSaga\Message\Ok;
 use PhluxorSaga\Message\Refused;
-use PhluxorSaga\ProtoBuf\DebitRolledBack;
-use PhluxorSaga\ProtoBuf\EscalateTransfer;
-use PhluxorSaga\ProtoBuf\FailedAndInconsistent;
-use PhluxorSaga\ProtoBuf\StatusUnknown;
-use PhluxorSaga\ProtoBuf\TransferFailed;
-use PhluxorSaga\ProtoBuf\TransferStarted;
+use PhluxorSaga\ProtoBuf;
+use Random\RandomException;
 
 class TransferProcess implements ActorInterface, PersistentInterface
 {
@@ -44,24 +42,22 @@ class TransferProcess implements ActorInterface, PersistentInterface
         private Ref $from,
         private Ref $to,
         private float $amount,
-        private PersistentInterface $persistence,
-        private string $persistenceId,
         private float $availability,
         private Behavior $behavior = new Behavior()
     ) {}
 
+    /**
+     * @throws RandomException
+     * @throws Exception
+     */
     public function receive(ContextInterface $context): void
     {
         $message = $context->message();
-
         switch (true) {
             case $message instanceof Started:
                 $this->behavior->become(new ReceiveFunction(
                     fn($context) => $this->starting($context)
                 ));
-                break;
-            case $message instanceof OfferSnapshot:
-                    // $message->snapshot();
                 break;
             case $message instanceof Stopping:
                 $this->stopping = true;
@@ -69,16 +65,37 @@ class TransferProcess implements ActorInterface, PersistentInterface
             case $message instanceof Restarting:
                 $this->restarting = true;
                 break;
-                // case Stopped _ when !_processCompleted:
             case $message instanceof Stopped && !$this->processCompleted:
-                $this->persistenceReceive(
-                    new TransferFailed('Process stopped unexpectedly'));
-                $this->persistenceReceive(
-                    new EscalateTransfer('Unknown failure. Transfer Process crashed'));
-                $context->send($context->parent(), new UnknownResult($context->self()));
+                $parent = $context->parent();
+                $self = $context->self();
+                if (!$this->recovering()) {
+                    $this->persistenceReceive(
+                        new ProtoBuf\TransferFailed('Process stopped unexpectedly')
+                    );
+                    $this->persistenceReceive(
+                        new ProtoBuf\EscalateTransfer('Unknown failure. Transfer Process crashed')
+                    );
+                }
+                $context->send($parent, new UnknownResult($self));
                 break;
             case $message instanceof Stopped && ($this->restarting || $this->stopping):
                 break;
+            case $message instanceof Message:
+                $this->applyEvent($message);
+                break;
+            default:
+                if ($this->fail()) {
+                    throw new Exception();
+                }
+                break;
+        }
+        $this->behavior->receive($context);
+    }
+
+    public function receiveRecover(mixed $message): void
+    {
+        if ($message instanceof Message) {
+            $this->applyEvent($message);
         }
     }
 
@@ -100,14 +117,117 @@ class TransferProcess implements ActorInterface, PersistentInterface
         );
     }
 
-    private function starting(ContextInterface $context): void
+    private function applyEvent(Message $event): void
     {
-        if ($context->message() instanceof TransferStarted) {
-            $context->spawnNamed($this->tryDebit($this->from, -$this->amount), 'DebitAttempt');
-            $this->persistenceReceive(new TransferStarted());
+        // Console.WriteLine($"Applying event: {@event.Data}");
+        switch (true) {
+            case $event instanceof ProtoBuf\TransferStarted:
+                $this->behavior->become(new ReceiveFunction(
+                    fn($context) => $this->awaitingDebitConfirmation($context)
+                ));
+                break;
+            case $event instanceof ProtoBuf\AccountDebited:
+                $this->behavior->become(new ReceiveFunction(
+                    fn($context) => $this->awaitingCreditConfirmation($context)
+                ));
+                break;
+            case $event instanceof ProtoBuf\CreditRefused:
+                $this->behavior->become(new ReceiveFunction(
+                    fn($context) => $this->rollingBackDebit($context)
+                ));
+                break;
+            case $event instanceof ProtoBuf\AccountCredited:
+            case $event instanceof ProtoBuf\DebitRolledBack:
+            case $event instanceof ProtoBuf\TransferFailed:
+                $this->processCompleted = true;
+                break;
         }
     }
 
+    /**
+     * @param ContextInterface $context
+     * @return void
+     */
+    private function starting(ContextInterface $context): void
+    {
+        if ($context->message() instanceof ProtoBuf\TransferStarted) {
+            $context->spawnNamed($this->tryDebit($this->from, -$this->amount), 'DebitAttempt');
+            $this->persistenceReceive(new ProtoBuf\TransferStarted());
+        }
+    }
+
+    /**
+     * @param ContextInterface $context
+     * @return void
+     */
+    private function awaitingDebitConfirmation(ContextInterface $context): void
+    {
+        $message = $context->message();
+        switch (true) {
+            case $message instanceof Started:
+                $context->spawnNamed(
+                    $this->tryDebit($this->from, -$this->amount), 'DebitAttempt');
+                break;
+            case $message instanceof Ok:
+                $this->persistenceReceive(new ProtoBuf\AccountDebited());
+                $context->spawnNamed(
+                    $this->tryCredit($this->to, +$this->amount), 'CreditAttempt');
+                break;
+            case $message instanceof Refused:
+                $parent = $context->parent();
+                $self = $context->self();
+                $this->persistenceReceive(new ProtoBuf\TransferFailed('Debit refused'));
+                $context->send($parent, new ProtoBuf\FailedAndInconsistent($self));
+                $this->stopAll($context);
+                break;
+            case $message instanceof Terminated:
+                $this->persistenceReceive(new ProtoBuf\StatusUnknown());
+                $this->stopAll($context);
+                break;
+        }
+    }
+
+    /**
+     * @param ContextInterface $context
+     * @return void
+     */
+    private function awaitingCreditConfirmation(ContextInterface $context): void
+    {
+        $message = $context->message();
+        switch (true) {
+            case $message instanceof Started:
+                $context->spawnNamed(
+                    $this->tryCredit($this->to, +$this->amount), 'CreditAttempt');
+                break;
+            case $message instanceof Ok:
+                $fromBalance = $context->requestFuture($this->from, new GetBalance(), 2000);
+                $fromBalanceResult = $fromBalance->result()->value();
+                $toBalance = $context->requestFuture($this->to, new GetBalance(), 2000);
+                $toBalanceResult = $toBalance->result()->value();
+                $this->persistenceReceive(new ProtoBuf\AccountDebited());
+                $completed = new ProtoBuf\TransferCompleted();
+                $this->persistenceReceive(
+                    $completed->setFromBalance((float) $fromBalanceResult)
+                    ->setToBalance((float) $toBalanceResult)
+                    ->setFrom($this->from->protobufPid())
+                    ->setTo($this->to->protobufPid()));
+                break;
+            case $message instanceof Refused:
+                $this->persistenceReceive(new ProtoBuf\CreditRefused());
+                $context->spawnNamed(
+                    $this->tryCredit($this->from, +$this->amount), 'RollbackDebit');
+                break;
+            case $message instanceof Terminated:
+                $this->persistenceReceive(new ProtoBuf\StatusUnknown());
+                $this->stopAll($context);
+                break;
+        }
+    }
+
+    /**
+     * @param ContextInterface $context
+     * @return void
+     */
     private function rollingBackDebit(ContextInterface $context): void
     {
         $message = $context->message();
@@ -117,31 +237,34 @@ class TransferProcess implements ActorInterface, PersistentInterface
                     $this->tryCredit($this->from, +$this->amount), 'RollbackDebit');
                 break;
             case $message instanceof Ok:
-                $this->persistenceReceive(new DebitRolledBack());
+                $this->persistenceReceive(new ProtoBuf\DebitRolledBack());
                 $this->persistenceReceive(
-                    new TransferFailed(
+                    new ProtoBuf\TransferFailed(
                         sprintf('Unable to rollback debit to %s', $this->to->protobufPid()->getId())
                     ));
-                $context->send($context->parent(), new FailedAndInconsistent($context->self()));
+                $context->send($context->parent(), new ProtoBuf\FailedAndInconsistent($context->self()));
                 $this->stopAll($context);
                 break;
             case $message instanceof Refused:
             case $message instanceof Terminated:
                 $this->persistenceReceive(
-                    new TransferFailed(
+                    new ProtoBuf\TransferFailed(
                         sprintf('Unable to rollback process. %s is owed %s',
                             $this->to->protobufPid()->getId(),
                             $this->amount
                         )
                     ));
                 $this->persistenceReceive(
-                    new EscalateTransfer(
+                    new ProtoBuf\EscalateTransfer(
                         sprintf('%s is owed %s',
                             $this->to->protobufPid()->getId(),
                             $this->amount
                         )
                     ));
-                $context->send($context->parent(), new FailedAndInconsistent($context->self()));
+                $context->send(
+                    $context->parent(),
+                    new ProtoBuf\FailedAndInconsistent($context->self())
+                );
                 $this->stopAll($context);
                 break;
         }
@@ -152,5 +275,14 @@ class TransferProcess implements ActorInterface, PersistentInterface
         $context->stop($this->from);
         $context->stop($this->to);
         $context->stop($context->self());
+    }
+
+    /**
+     * @throws RandomException
+     */
+    private function fail(): bool
+    {
+        $comparison = random_int(0, 100);
+        return $comparison > $this->availability;
     }
 }

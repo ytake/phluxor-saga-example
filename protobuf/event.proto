@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package protobuf;
+import "actor.proto";
 
 option php_namespace = "PhluxorSaga\\ProtoBuf";
 option php_metadata_namespace = "PhluxorSaga\\Metadata\\ProtoBuf";
@@ -24,3 +25,14 @@ message FailedAndInconsistent {}
 message FailedButConsistentResult {}
 
 message DebitRolledBack {}
+
+message CreditRefused {}
+
+message AccountCredited {}
+
+message TransferCompleted {
+  actor.Pid from = 1;
+  float from_balance = 2;
+  actor.Pid to = 3;
+  float to_balance = 4;
+}

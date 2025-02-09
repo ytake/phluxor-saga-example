@@ -15,8 +15,9 @@ class Event
         if (static::$is_initialized == true) {
           return;
         }
+        \Phluxor\Metadata\ProtoBuf\Actor::initOnce();
         $pool->internalAddGeneratedFile(
-            "\x0A\x9D\x02\x0A\x0Bevent.proto\x12\x08protobuf\" \x0A\x0ETransferFailed\x12\x0E\x0A\x06reason\x18\x01 \x01(\x09\"\x0F\x0A\x0DStatusUnknown\"\x11\x0A\x0FTransferStarted\"\x10\x0A\x0EAccountDebited\"\"\x0A\x10EscalateTransfer\x12\x0E\x0A\x06reason\x18\x01 \x01(\x09\"\x17\x0A\x15FailedAndInconsistent\"\x1B\x0A\x19FailedButConsistentResult\"\x11\x0A\x0FDebitRolledBackB7\xCA\x02\x14PhluxorSaga\\ProtoBuf\xE2\x02\x1DPhluxorSaga\\Metadata\\ProtoBufb\x06proto3"
+            "\x0A\xB2\x03\x0A\x0Bevent.proto\x12\x08protobuf\" \x0A\x0ETransferFailed\x12\x0E\x0A\x06reason\x18\x01 \x01(\x09\"\x0F\x0A\x0DStatusUnknown\"\x11\x0A\x0FTransferStarted\"\x10\x0A\x0EAccountDebited\"\"\x0A\x10EscalateTransfer\x12\x0E\x0A\x06reason\x18\x01 \x01(\x09\"\x17\x0A\x15FailedAndInconsistent\"\x1B\x0A\x19FailedButConsistentResult\"\x11\x0A\x0FDebitRolledBack\"\x0F\x0A\x0DCreditRefused\"\x11\x0A\x0FAccountCredited\"o\x0A\x11TransferCompleted\x12\x18\x0A\x04from\x18\x01 \x01(\x0B2\x0A.actor.Pid\x12\x14\x0A\x0Cfrom_balance\x18\x02 \x01(\x02\x12\x16\x0A\x02to\x18\x03 \x01(\x0B2\x0A.actor.Pid\x12\x12\x0A\x0Ato_balance\x18\x04 \x01(\x02B7\xCA\x02\x14PhluxorSaga\\ProtoBuf\xE2\x02\x1DPhluxorSaga\\Metadata\\ProtoBufb\x06proto3"
         , true);
 
         static::$is_initialized = true;
