@@ -14,6 +14,10 @@ use Google\Protobuf\Internal\GPBUtil;
  */
 class FailedAndInconsistent extends \Google\Protobuf\Internal\Message
 {
+    /**
+     * Generated from protobuf field <code>.actor.Pid from = 1;</code>
+     */
+    protected $from = null;
 
     /**
      * Constructor.
@@ -21,11 +25,44 @@ class FailedAndInconsistent extends \Google\Protobuf\Internal\Message
      * @param array $data {
      *     Optional. Data for populating the Message object.
      *
+     *     @type \Phluxor\ActorSystem\ProtoBuf\Pid $from
      * }
      */
     public function __construct($data = NULL) {
         \PhluxorSaga\Metadata\ProtoBuf\Event::initOnce();
         parent::__construct($data);
+    }
+
+    /**
+     * Generated from protobuf field <code>.actor.Pid from = 1;</code>
+     * @return \Phluxor\ActorSystem\ProtoBuf\Pid|null
+     */
+    public function getFrom()
+    {
+        return $this->from;
+    }
+
+    public function hasFrom()
+    {
+        return isset($this->from);
+    }
+
+    public function clearFrom()
+    {
+        unset($this->from);
+    }
+
+    /**
+     * Generated from protobuf field <code>.actor.Pid from = 1;</code>
+     * @param \Phluxor\ActorSystem\ProtoBuf\Pid $var
+     * @return $this
+     */
+    public function setFrom($var)
+    {
+        GPBUtil::checkMessage($var, \Phluxor\ActorSystem\ProtoBuf\Pid::class);
+        $this->from = $var;
+
+        return $this;
     }
 
 }

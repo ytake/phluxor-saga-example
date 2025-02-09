@@ -8,13 +8,12 @@ use Closure;
 
 readonly class ForWithProgress
 {
-
     public function __construct(
         private int $total,
         private int $everyNth,
         private bool $runBothOnEvery,
-        private bool $runOnStart)
-    {}
+        private bool $runOnStart
+    ) {}
 
     /**
      * @param Closure(int): void  $everyNthAction

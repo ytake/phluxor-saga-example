@@ -10,9 +10,9 @@ use Google\Protobuf\Internal\RepeatedField;
 use Google\Protobuf\Internal\GPBUtil;
 
 /**
- * Generated from protobuf message <code>protobuf.FailedButConsistentResult</code>
+ * Generated from protobuf message <code>protobuf.SuccessResult</code>
  */
-class FailedButConsistentResult extends \Google\Protobuf\Internal\Message
+class SuccessResult extends \Google\Protobuf\Internal\Message
 {
     /**
      * Generated from protobuf field <code>.actor.Pid from = 1;</code>

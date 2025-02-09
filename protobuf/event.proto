@@ -20,9 +20,17 @@ message EscalateTransfer {
   string reason = 1;
 }
 
-message FailedAndInconsistent {}
+message FailedAndInconsistent {
+  actor.Pid from = 1;
+}
 
-message FailedButConsistentResult {}
+message FailedButConsistentResult {
+  actor.Pid from = 1;
+}
+
+message SuccessResult {
+  actor.Pid from = 1;
+}
 
 message DebitRolledBack {}
 
