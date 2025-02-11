@@ -8,6 +8,7 @@ use Phluxor\ActorSystem\Context\ContextInterface;
 use Phluxor\ActorSystem\Message\ActorInterface;
 use Phluxor\ActorSystem\Message\Started;
 use Phluxor\ActorSystem\Props;
+use Phluxor\ActorSystem\ProtoBuf\Pid;
 use Phluxor\ActorSystem\Ref;
 use Phluxor\Persistence\InMemoryProvider;
 use PhluxorSaga\Internal\ForWithProgress;
@@ -46,7 +47,7 @@ class Runner implements ActorInterface
 
             case $message instanceof UnknownResult:
                 $this->unknownResults++;
-                $this->checkForCompletion($message->sender);
+                $this->checkForCompletion($message->sender->protobufPid());
                 break;
 
             case $message instanceof FailedAndInconsistent:
@@ -79,8 +80,7 @@ class Runner implements ActorInterface
                             $inMemoryProvider
                         );
                         $transfer = $factory->createTransfer($actorName, $fromAccount, $toAccount, 10);
-                        $this->transfers[] = $transfer;
-
+                        $this->transfers[] = (string) $transfer->getRef();
                         if ($i === $this->numberOfIterations && !$nth) {
                             print("Started {$i}/{$this->numberOfIterations} processes\n");
                         }
@@ -90,11 +90,10 @@ class Runner implements ActorInterface
         }
     }
 
-    private function checkForCompletion(Ref $pid): void
+    private function checkForCompletion(Pid $pid): void
     {
-        $this->transfers = array_filter($this->transfers, fn($t) => $t !== $pid);
+        $this->transfers = array_filter($this->transfers, fn($t) => $t !== $pid->getId());
         $remaining = count($this->transfers);
-
         if ($this->numberOfIterations >= $this->intervalBetweenConsoleUpdates) {
             print(".");
             if ($remaining % ($this->numberOfIterations / $this->intervalBetweenConsoleUpdates) === 0) {
@@ -105,7 +104,7 @@ class Runner implements ActorInterface
         }
 
         if ($remaining === 0) {
-            usleep(250000);
+            \Swoole\Coroutine::sleep(2);
             print("\nRESULTS:\n");
             printf(
                 "%.2f%% (%d/%d) successful transfers\n",
@@ -141,7 +140,7 @@ class Runner implements ActorInterface
 
     private function inMemoryProvider(): InMemoryStateProvider
     {
-        return new InMemoryStateProvider(new InMemoryProvider(1));
+        return new InMemoryStateProvider(new InMemoryProvider(2));
     }
 
     private function createAccount(ContextInterface $context, string $name): Ref

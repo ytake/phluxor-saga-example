@@ -11,7 +11,6 @@ use Phluxor\ActorSystem\Ref;
 use Phluxor\ActorSystem\SpawnResult;
 use Phluxor\ActorSystem\Strategy\OneForOneStrategy;
 use Phluxor\ActorSystem\Supervision\DefaultDecider;
-use Phluxor\Persistence\EventSourcedBehavior;
 use Phluxor\Persistence\ProviderInterface;
 
 readonly class TransferFactory
@@ -40,7 +39,7 @@ readonly class TransferFactory
         $props = Props::fromProducer(
             fn() => new TransferProcess($fromAccount, $toAccount, $amount, $this->availability),
             Props::withReceiverMiddleware(
-                new EventSourcedBehavior($this->provider)
+                new EventSourcedFactory($this->provider)
             ),
             Props::withSupervisor(
                 new OneForOneStrategy(

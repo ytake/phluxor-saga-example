@@ -36,7 +36,7 @@ readonly class AccountProxy implements ActorInterface
         switch (true) {
             case $message instanceof Started:
                 $context->send($this->target, ($this->createMessage)($context->self()));
-                $context->setReceiveTimeout(new DateInterval('PT0.1S'));
+                $context->setReceiveTimeout(new DateInterval('PT2S'));
                 break;
             case $message instanceof Refused:
             case $message instanceof Ok:

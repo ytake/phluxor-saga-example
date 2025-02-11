@@ -74,7 +74,6 @@ class Account implements ActorInterface
             return;
         }
         usleep(random_int(0, 150) * 1000);
-        \Swoole\Coroutine::sleep(0.1);
         $this->balance += $message->amount;
         $this->processedMessages[(string) $message->replyTo] = new Message\Ok();
 
