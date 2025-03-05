@@ -118,7 +118,6 @@ class TransferProcess implements ActorInterface, PersistentInterface
 
     private function applyEvent(Message $event): void
     {
-        // var_dump(get_debug_type($event));
         switch (true) {
             case $event instanceof ProtoBuf\TransferStarted:
                 $this->behavior->become(
