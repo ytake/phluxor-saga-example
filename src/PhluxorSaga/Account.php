@@ -73,7 +73,7 @@ class Account implements ActorInterface
             $context->send($message->replyTo, new Message\InternalServerError());
             return;
         }
-        usleep(random_int(0, 150) * 1000);
+        usleep(random_int(0, 150) * 100);
         $this->balance += $message->amount;
         $this->processedMessages[(string) $message->replyTo] = new Message\Ok();
 

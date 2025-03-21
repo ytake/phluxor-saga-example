@@ -44,5 +44,6 @@ run(function () {
             ),
         );
         $system->root()->spawnNamed($props, 'runner');
+        \Swoole\Coroutine::sleep(2);
     });
 });

@@ -1,0 +1,8 @@
+services:
+  saga:
+    container_name: saga
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile
+    volumes:
+      - ./:/var/app

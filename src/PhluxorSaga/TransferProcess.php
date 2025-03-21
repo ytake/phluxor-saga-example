@@ -228,9 +228,9 @@ class TransferProcess implements ActorInterface, PersistentInterface
                 break;
             case $message instanceof Ok:
                 $parent = $context->parent();
-                $fromBalance = $context->requestFuture($this->from, new GetBalance(), 2000);
+                $fromBalance = $context->requestFuture($this->from, new GetBalance(), 2);
                 $fromBalanceResult = $fromBalance->result()->value();
-                $toBalance = $context->requestFuture($this->to, new GetBalance(), 2000);
+                $toBalance = $context->requestFuture($this->to, new GetBalance(), 2);
                 $toBalanceResult = $toBalance->result()->value();
                 $this->persistEvent(new ProtoBuf\AccountCredited());
                 $completed = new ProtoBuf\TransferCompleted();
